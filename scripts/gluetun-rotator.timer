@@ -1,0 +1,12 @@
+[Unit]
+Description=Gluetun VPN Server Rotation Timer
+Requires=gluetun-rotator.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

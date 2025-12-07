@@ -1,0 +1,136 @@
+groups:
+  - name: firecrawl_alerts
+    interval: 30s
+    rules:
+      # API Health
+      - alert: FirecrawlAPIDown
+        expr: up{job="firecrawl-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Firecrawl API is down"
+          description: "Firecrawl API has been down for more than 2 minutes"
+
+      - alert: FirecrawlHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on Firecrawl API"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      - alert: FirecrawlHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on Firecrawl API"
+          description: "95th percentile latency is {{ $value }}s (threshold: 30s)"
+
+      # VPN Health
+      - alert: GluetunVPNDown
+        expr: up{job="gluetun"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gluetun VPN is down"
+          description: "VPN connection has been down for more than 3 minutes"
+
+      - alert: VPNRotationFailed
+        expr: increase(vpn_rotation_failures_total[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "VPN rotation failing repeatedly"
+          description: "VPN rotation has failed {{ $value }} times in the last hour"
+
+      # Container Health
+      - alert: ContainerUnhealthy
+        expr: container_health_status{state="unhealthy"} == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.container_name }} is unhealthy"
+          description: "Container has been unhealthy for more than 2 minutes"
+
+      - alert: ContainerRestarting
+        expr: rate(container_restart_count[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.container_name }} is restarting frequently"
+          description: "Container has restarted {{ $value }} times in the last 10 minutes"
+
+      # Resource Usage
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanizePercentage }} (threshold: 80%)"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+
+      # Redis
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 2 minutes"
+
+      # PostgreSQL
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL has been down for more than 2 minutes"
+
+      # Throughput
+      - alert: HighRequestVolume
+        expr: rate(http_requests_total[5m]) > 100
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "High request volume"
+          description: "Receiving {{ $value }} requests/second. Consider scaling."
+
+      - alert: QueueBacklog
+        expr: redis_queue_length > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large queue backlog"
+          description: "Queue has {{ $value }} pending jobs. May need more workers."

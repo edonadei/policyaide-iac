@@ -1,0 +1,15 @@
+[Unit]
+Description=Gluetun VPN Server Rotator
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/firecrawl-production
+ExecStart=/root/firecrawl-production/scripts/rotate-gluetun.sh
+StandardOutput=append:/var/log/gluetun-rotation.log
+StandardError=append:/var/log/gluetun-rotation.log
+User=root
+
+[Install]
+WantedBy=multi-user.target

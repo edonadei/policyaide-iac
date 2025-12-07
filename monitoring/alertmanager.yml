@@ -1,0 +1,101 @@
+global:
+  resolve_timeout: 5m
+  # SMTP configuration for email alerts
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: '${SMTP_FROM}'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Templates for alert messages
+templates:
+  - '/etc/alertmanager/*.tmpl'
+
+# Route tree
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default'
+
+  routes:
+    # Critical alerts go to both Slack and email immediately
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 4h
+
+    # Warning alerts go to Slack only
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      repeat_interval: 12h
+
+    # Info alerts go to Slack with lower frequency
+    - match:
+        severity: info
+      receiver: 'slack-info'
+      repeat_interval: 24h
+
+# Inhibition rules
+inhibit_rules:
+  # Inhibit warning if critical is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+receivers:
+  # Default receiver (does nothing, fallback)
+  - name: 'default'
+
+  # Critical alerts (Slack + Email)
+  - name: 'critical-alerts'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-critical'
+        title: ':rotating_light: Critical Alert'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Environment:* {{ .CommonLabels.environment }}
+        send_resolved: true
+    email_configs:
+      - to: '${ALERT_EMAIL}'
+        headers:
+          subject: '[CRITICAL] {{ .GroupLabels.alertname }} - Firecrawl Production'
+        html: |
+          <h2>Critical Alert</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Summary:</strong> {{ .CommonAnnotations.summary }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          <p><strong>Environment:</strong> {{ .CommonLabels.environment }}</p>
+          <p><strong>Started:</strong> {{ .StartsAt }}</p>
+        send_resolved: true
+
+  # Warning alerts (Slack only)
+  - name: 'slack-warnings'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-warnings'
+        title: ':warning: Warning'
+        text: |
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+        send_resolved: true
+
+  # Info alerts (Slack only, condensed)
+  - name: 'slack-info'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-info'
+        title: ':information_source: Info'
+        text: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        send_resolved: false
