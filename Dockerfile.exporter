@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y     curl     ca-certificates     iproute2     && rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI for accessing logs
+RUN curl -fsSL https://get.docker.com -o get-docker.sh &&     sh get-docker.sh &&     rm get-docker.sh
+
+COPY metrics-exporter.py /metrics-exporter.py
+RUN chmod +x /metrics-exporter.py
+
+CMD ["python3", "/metrics-exporter.py"]
