@@ -18,19 +18,17 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     restart: unless-stopped
+    network_mode: host
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=grafana_admin_2024
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_SERVER_HTTP_PORT=3003
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-    ports:
-      - "127.0.0.1:3003:3000"
-    networks:
-      - monitoring
 
   node-exporter:
     image: prom/node-exporter:latest
