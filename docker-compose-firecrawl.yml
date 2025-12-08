@@ -1,0 +1,87 @@
+name: firecrawl
+
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=mullvad
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=FqBKjOfl+maagku79bQOzKbz1GRIKTqwKkF9xpdyPqs=
+      - WIREGUARD_ADDRESSES=10.156.248.200/32
+      - SERVER_CITIES=New York NY
+      - HTTPPROXY=on
+      - HTTPPROXY_LISTENING_ADDRESS=:8888
+      - TZ=America/New_York
+    ports:
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+
+  playwright-service:
+    image: firecrawl-production-playwright-service:latest
+    container_name: firecrawl-playwright-service
+    network_mode: "container:gluetun"
+    depends_on:
+      - gluetun
+    environment:
+      PORT: 3000
+      BLOCK_MEDIA: ${BLOCK_MEDIA:-false}
+
+  api:
+    image: firecrawl-production-api:latest
+    container_name: firecrawl-api
+    network_mode: host
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      REDIS_URL: redis://localhost:6379
+      REDIS_RATE_LIMIT_URL: redis://localhost:6379
+      PLAYWRIGHT_MICROSERVICE_URL: http://localhost:3000/scrape
+      NUQ_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      USE_DB_AUTHENTICATION: false
+      PROXY_SERVER: http://localhost:8888
+      PORT: 3002
+      HOST: 0.0.0.0
+      NUM_WORKERS_PER_QUEUE: 8
+      LOG_LEVEL: info
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: firecrawl-redis
+    network_mode: host
+    command: redis-server --bind 127.0.0.1
+    restart: unless-stopped
+
+  nuq-postgres:
+    image: firecrawl-nuq-postgres:latest
+    container_name: firecrawl-nuq-postgres
+    network_mode: host
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      PGDATA: /var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Metrics exporter for monitoring
+  metrics-exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.exporter
+    image: firecrawl-exporter:latest
+    container_name: firecrawl-metrics-exporter
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    depends_on:
+      - api

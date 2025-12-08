@@ -6,19 +6,19 @@ scrape_configs:
   # Firecrawl custom metrics (API status, VPN status, request count)
   - job_name: 'firecrawl'
     static_configs:
-      - targets: ['firecrawl-exporter:9101']
+      - targets: ['localhost:9101']
 
   # Prometheus itself
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # System metrics
+  # System metrics (on monitoring network)
   - job_name: 'node'
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ['localhost:9100']
 
-  # Container metrics
+  # Container metrics (on monitoring network)
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['cadvisor:8080']
+      - targets: ['localhost:8080']
